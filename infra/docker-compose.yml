@@ -1,23 +1,5 @@
 version: "3.9"
 services:
-  backend:
-    build:
-      context: ../
-      dockerfile: infra/docker/Dockerfile.backend
-    env_file:
-      - ./env/backend.env
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
-  frontend:
-    build:
-      context: ../
-      dockerfile: infra/docker/Dockerfile.frontend
-    env_file:
-      - ./env/frontend.env
-    ports:
-      - "5173:5173"
   db:
     image: postgres:15-alpine
     environment:
@@ -28,5 +10,46 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ..
+      dockerfile: infra/backend.Dockerfile
+    working_dir: /app/backend
+    env_file:
+      - ./env/backend.env
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py loaddata hotelms/fixtures/seed.json || true &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ../backend:/app/backend
+    environment:
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: hotelms
+      DB_USER: hotelms
+      DB_PASSWORD: hotelms
+      DB_HOST: db
+      DJANGO_ALLOWED_HOSTS: "*"
+      DJANGO_DEBUG: "1"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: infra/frontend.Dockerfile
+    working_dir: /app/frontend
+    volumes:
+      - ../frontend:/app/frontend
+    environment:
+      VITE_API_URL: http://localhost:8000/api
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
 volumes:
   db_data:
